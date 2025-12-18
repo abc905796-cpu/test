@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>REGALO STUDIO | 指尖藝術空間</title>
+    
+    <!-- 資源載入：Tailwind CSS 與 Google 字體 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+TC:wght@400;600&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              serif: ['"Noto Serif TC"', 'serif'],
+              sans: ['"Noto Sans TC"', 'sans-serif'],
+              display: ['"Cinzel"', 'serif'],
+            },
+            colors: {
+              cream: { 50: '#FDFCF8', 100: '#F9F6F0', 200: '#F0EBE0', 300: '#E6DFC8' },
+              sand: { 400: '#D4C5A9', 500: '#BFA985', 600: '#9E8866' },
+              stone: { 800: '#44403C' }
+            }
+          }
+        }
+      }
+    </script>
+
+    <style>
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      body { background-color: #FDFCF8; font-family: "Noto Sans TC", sans-serif; }
+      .selection-sand ::selection { background: #F0EBE0; }
+    </style>
+</head>
+<body class="selection-sand">
+    <div id="root"></div>
+
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.294.0",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+  }
+}
+</script>
+
+    <script type="module">
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import * as Lucide from 'lucide-react';
+        import { GoogleGenAI } from '@google/genai';
+
+        // --- 1. 資料常量 (Constants) ---
+        const SALON_NAME = "REGALO";
+        const PEER_WARNING = "為保證教學課程付費學員之權益，恕不接待同行預約服務";
+        const LINE_URL = "https://lin.ee/5RqneZb";
+
+        const SALON_FEATURES = [
+          { title: "採用一層殘", description: "本店堅持採用日式「一層殘」技術（Fill-in）。不同於傳統完全卸甲，此技術在修整時保留基底膠層，避免反覆拋磨真甲表面。這能有效保護指甲結構，維持健康厚度。" },
+          { title: "課程教學", description: "提供【零基礎全科班】、【進修課程】及【客製化課程】。採小班制教學，手把手指導，歡迎私訊諮詢課程細節。", lineUrl: "https://lin.ee/zJHaM9bD" },
+          { title: "日系 Nuance", description: "捕捉光影與色彩的流動感，堆疊出如水彩般輕柔、富有層次的藝術氣息。" },
+          { title: "日系個性派", description: "運用金屬元素、特殊異材質、礦石紋理或不對稱設計，展現強烈的個人風格。" },
+          { title: "日系暈染", description: "透過多層色彩的堆疊與拍刷，營造出自然的漸變與水墨般的渲染效果。" }
+        ];
+
+        const ARTIST_LIST = [
+          { 
+            name: "里安 (Lian)", title: "Founder / 講師", experience: "資歷 10 年", specialties: ["日系 Nuance", "個性派"], tags: ["細節控", "質感堅持"],
+            description: "對指尖的美感與精緻度有不妥協的堅持。擅長日系個性風與 Nuance 暈染。", instagramUrl: "https://www.instagram.com/regalolian_"
+          },
+          { 
+            name: "安安 (Ann)", title: "美甲師", experience: "資歷 1.5 年", specialties: ["韓系清新", "日系暈染"], tags: ["I 人美甲師", "細心認真"],
+            description: "細心認真的美甲師，擅長清透自然風格。價格親民，小資首選。", instagramUrl: "https://www.instagram.com/regalo_annn"
+          }
+        ];
+
+        const PRICE_LIST_LIAN = [
+          { title: "GEL POLISH | 凝膠", items: [{name: "貓眼", price: "1600"}, {name: "設計款", price: "2300 up"}] },
+          { title: "REMOVE | 卸甲", items: [{name: "本店續作", price: "200"}, {name: "他店續作", price: "300"}] }
+        ];
+
+        const PRICE_LIST_ANN = [
+          { title: "GEL POLISH | 凝膠", items: [{name: "單色", price: "800"}, {name: "設計款", price: "1200-1600"}] },
+          { title: "REMOVE | 卸甲", items: [{name: "本店續作", price: "200"}, {name: "他店續作", price: "300"}] }
+        ];
+
+        const FAQ_LIST = [
+          { question: "現場提供哪些付款方式？", answer: "我們提供「現金」與「銀行轉帳」服務。" },
+          { question: "需要付定金嗎？", answer: "新客預約需支付定金 $500，確認後提供帳號，需於 24 小時內匯款。" }
+        ];
+
+        // --- 2. 小型組件 ---
+        const Icon = ({ name, size = 16, className = "" }) => {
+          const LucideIcon = Lucide[name];
+          return LucideIcon ? React.createElement(LucideIcon, { size, className }) : null;
+        };
+
+        const Navigation = ({ activeTab, onTabChange }) => {
+          const tabs = [
+            { id: 'booking_form', label: '我要預約', icon: 'PenTool' },
+            { id: 'prices', label: '價目表' },
+            { id: 'artists', label: '美甲師' },
+            { id: 'faq', label: '常見QA' }
+          ];
+          return (
+            <nav className="sticky top-0 z-50 bg-cream-50/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+              <div className="max-w-md mx-auto flex overflow-x-auto no-scrollbar py-3 px-4 gap-2">
+                {tabs.map(tab => (
+                  <button 
+                    key={tab.id} 
+                    onClick={() => onTabChange(tab.id)} 
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-sm font-medium transition-all border flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-stone-800 text-white border-stone-800 shadow-md' : 'bg-white text-stone-500 border-stone-200'}`}
+                  >
+                    {tab.icon && <Icon name={tab.icon} size={14} />} {tab.label}
+                  </button>
+                ))}
+              </div>
+            </nav>
+          );
+        };
+
+        // --- 3. 預約表單組件 ---
+        const BookingForm = () => {
+          const [form, setForm] = useState({ name: '', phone: '', artist: 'lian', services: [], removal: '', repair: 'no', extension: 'no' });
+          const [copied, setCopied] = useState(false);
+
+          const toggleService = (s) => setForm(f => ({ ...f, services: f.services.includes(s) ? f.services.filter(x => x !== s) : [...f.services, s] }));
+
+          const msg = `● 預約姓名：${form.name}\n● 手機：${form.phone}\n● 指定老師：${form.artist === 'lian' ? '里安' : '安安'}\n● 項目：${form.services.join(', ')}\n● 卸甲：${form.removal}\n● 補甲：${form.repair === 'yes' ? '是' : '否'}\n● 延甲：${form.extension === 'yes' ? '是' : '否'}`;
+
+          const handleCopy = () => {
+            if(!form.name || !form.phone) return alert('請填寫必填欄位');
+            navigator.clipboard.writeText(msg);
+            setCopied(true);
+            setTimeout(() => { window.open(LINE_URL, '_blank'); setCopied(false); }, 1000);
+          };
+
+          return (
+            <div className="animate-fade-in space-y-6 pb-20">
+              <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                <h3 className="font-serif text-lg mb-4 flex items-center gap-2"><Icon name="PenTool" /> 預約資料</h3>
+                <input placeholder="姓名 *" className="w-full bg-cream-50 p-3 rounded-xl border mb-3 outline-none" onChange={e => setForm({...form, name: e.target.value})} />
+                <input placeholder="手機 *" className="w-full bg-cream-50 p-3 rounded-xl border mb-6 outline-none" onChange={e => setForm({...form, phone: e.target.value})} />
+                
+                <h4 className="text-xs font-bold text-stone-400 mb-2">指定美甲師</h4>
+                <div className="flex gap-2 mb-6">
+                   {['lian', 'ann'].map(a => <button key={a} onClick={() => setForm({...form, artist: a})} className={`flex-1 py-2 rounded-lg text-sm border ${form.artist === a ? 'bg-stone-800 text-white' : 'bg-white text-stone-500'}`}>{a === 'lian' ? '里安' : '安安'}</button>)}
+                </div>
+
+                <h4 className="text-xs font-bold text-stone-400 mb-2">預覽內容</h4>
+                <pre className="text-xs bg-stone-50 p-4 rounded-xl text-stone-500 whitespace-pre-wrap leading-relaxed">{msg}</pre>
+                
+                <button onClick={handleCopy} className={`w-full mt-6 py-4 rounded-xl font-bold shadow-lg transition-all ${copied ? 'bg-green-600 text-white' : 'bg-stone-800 text-white active:scale-95'}`}>
+                  {copied ? '已複製！開啟 LINE...' : '複製並預約'}
+                </button>
+              </div>
+            </div>
+          );
+        };
+
+        // --- 4. 主程式 (App) ---
+        const App = () => {
+          const [activeTab, setActiveTab] = useState('prices');
+          const [priceArtist, setPriceArtist] = useState('lian');
+          const [selectedFeature, setSelectedFeature] = useState(null);
+
+          const renderContent = () => {
+            switch(activeTab) {
+              case 'prices':
+                const list = priceArtist === 'lian' ? PRICE_LIST_LIAN : PRICE_LIST_ANN;
+                return (
+                  <div className="animate-fade-in space-y-6 pb-20">
+                    <div className="flex justify-center gap-3 mb-6">
+                      <button onClick={() => setPriceArtist('lian')} className={`px-6 py-2 rounded-full text-sm border ${priceArtist === 'lian' ? 'bg-stone-800 text-white' : 'bg-white'}`}>里安</button>
+                      <button onClick={() => setPriceArtist('ann')} className={`px-6 py-2 rounded-full text-sm border ${priceArtist === 'ann' ? 'bg-stone-800 text-white' : 'bg-white'}`}>安安</button>
+                    </div>
+                    {list.map((cat, i) => (
+                      <div key={i} className="bg-white p-6 rounded-2xl border shadow-sm">
+                        <h3 className="font-serif text-sand-600 border-b pb-3 mb-4">{cat.title}</h3>
+                        {cat.items.map((item, j) => (
+                          <div key={j} className="flex justify-between items-baseline mb-3 text-sm">
+                            <span>{item.name}</span>
+                            <div className="flex-grow border-b border-dotted mx-2"></div>
+                            <span className="font-serif font-bold text-stone-800">${item.price}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                );
+              case 'artists':
+                return (
+                  <div className="animate-fade-in space-y-6 pb-20">
+                    {ARTIST_LIST.map((a, i) => (
+                      <div key={i} className="bg-white p-6 rounded-2xl border shadow-sm">
+                        <div className="flex justify-between mb-4">
+                          <h3 className="text-xl font-serif font-bold">{a.name} <span className="text-xs bg-sand-500 text-white px-2 py-0.5 rounded-full ml-1 font-sans font-normal">{a.title}</span></h3>
+                          <a href={a.instagramUrl} target="_blank"><Icon name="Instagram" className="text-stone-400" /></a>
+                        </div>
+                        <p className="text-stone-600 text-sm leading-relaxed mb-4">{a.description}</p>
+                        <button onClick={() => { setPriceArtist(i === 0 ? 'lian' : 'ann'); setActiveTab('prices'); }} className="w-full py-3 bg-stone-50 text-stone-600 text-xs rounded-xl border hover:bg-stone-100 transition-colors">查看價目表</button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              case 'booking_form': return <BookingForm />;
+              case 'faq':
+                return (
+                  <div className="animate-fade-in space-y-4 pb-20">
+                    {FAQ_LIST.map((faq, i) => (
+                      <div key={i} className="bg-white p-6 rounded-2xl border shadow-sm">
+                        <h4 className="font-bold text-stone-800 mb-2">{faq.question}</h4>
+                        <p className="text-sm text-stone-500 leading-relaxed">{faq.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+            }
+          };
+
+          return (
+            <div className="min-h-screen pb-24">
+              <header className="pt-12 pb-8 text-center px-4">
+                <h1 className="font-display text-4xl tracking-[0.3em] text-stone-800 mb-8">{SALON_NAME}</h1>
+                <div className="max-w-xs mx-auto space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    {SALON_FEATURES.slice(0, 2).map((f, i) => <button key={i} onClick={() => setSelectedFeature(f)} className="bg-white border border-sand-200/50 rounded-xl py-3 text-xs text-stone-600 shadow-sm active:scale-95">{f.title}</button>)}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SALON_FEATURES.slice(2, 5).map((f, i) => <button key={i} onClick={() => setSelectedFeature(f)} className="bg-white border border-sand-200/50 rounded-xl py-3 text-[10px] text-stone-600 shadow-sm active:scale-95">{f.title}</button>)}
+                  </div>
+                </div>
+              </header>
+
+              <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+              <main className="max-w-md mx-auto px-4 pt-10">{renderContent()}</main>
+
+              {/* 固定底部按鈕 */}
+              <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-cream-50 via-cream-50 to-transparent z-40">
+                <div className="max-w-md mx-auto flex gap-3">
+                  <button onClick={() => setActiveTab('prices')} className="flex-1 bg-white border border-stone-200 text-stone-600 py-3 rounded-xl text-sm shadow-sm">返回首頁</button>
+                  <a href={LINE_URL} target="_blank" className="flex-[2] bg-stone-800 text-white font-medium py-3 rounded-xl shadow-lg flex items-center justify-center gap-2 text-sm active:scale-95">
+                    <Icon name="MessageCircle" /> 立即預約
+                  </a>
+                </div>
+              </div>
+
+              {/* 特色彈窗 */}
+              {selectedFeature && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                  <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={() => setSelectedFeature(null)} />
+                  <div className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8 animate-fade-in">
+                    <button onClick={() => setSelectedFeature(null)} className="absolute top-6 right-6 text-stone-300 hover:text-stone-600"><Icon name="X" size={24}/></button>
+                    <h3 className="font-serif text-xl mb-6 border-b pb-4 text-stone-800">{selectedFeature.title}</h3>
+                    <p className="text-sm text-stone-500 leading-relaxed">{selectedFeature.description}</p>
+                    {selectedFeature.lineUrl && <a href={selectedFeature.lineUrl} target="_blank" className="mt-8 block bg-[#06C755] text-white text-center py-3 rounded-xl text-sm font-bold">諮詢課程教學</a>}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
